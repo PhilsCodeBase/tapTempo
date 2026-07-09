@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tap Tempo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      min-height: 100vh;
+      background: #080810;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #glow {
+      position: absolute;
+      width: 480px; height: 480px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0.5;
+      transition: opacity 0.6s;
+    }
+
+    #top-label {
+      position: absolute;
+      top: 36px;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: #3a3a6a;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    #tap-btn {
+      position: relative;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 40%, #3b1d8a, #0e0820);
+      border: 2px solid #1e1245;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03);
+      transition: background 0.1s, box-shadow 0.2s, border-color 0.4s, transform 0.08s;
+      touch-action: none;
+      z-index: 2;
+    }
+    #tap-btn.pressing {
+      background: radial-gradient(circle at 50% 40%, #5b21b6, #1a0a3a);
+      box-shadow: 0 0 0 6px rgba(124,58,237,0.15), 0 0 60px rgba(124,58,237,0.3);
+      transform: scale(0.962);
+    }
+    #tap-btn.has-result {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 1px rgba(124,58,237,0.2), 0 0 40px rgba(124,58,237,0.15);
+    }
+    #tap-btn.pressing.has-result {
+      box-shadow: 0 0 0 6px rgba(124,58,237,0.15), 0 0 60px rgba(124,58,237,0.3);
+    }
+
+    #bpm-number {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      color: #2a2a6a;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      transition: font-size 0.2s, color 0.3s;
+    }
+    #bpm-number.has-result {
+      font-size: 72px;
+      color: #f0f0ff;
+      letter-spacing: -0.03em;
+    }
+
+    #bpm-unit {
+      font-size: 11px;
+      color: #7c3aed;
+      margin-top: 6px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 600;
+      pointer-events: none;
+      display: none;
+    }
+
+    .ripple {
+      position: absolute;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 2px solid rgba(124,58,237,0.7);
+      animation: ripple 0.85s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes ripple {
+      0%   { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    #tempo-label {
+      margin-top: 28px;
+      height: 20px;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      color: #5b3ea8;
+      text-transform: uppercase;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    #dots {
+      display: flex;
+      gap: 6px;
+      margin-top: 20px;
+      height: 8px;
+      align-items: center;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #1a1a36;
+      transition: all 0.15s;
+    }
+    .dot.active {
+      width: 8px; height: 8px;
+      background: #7c3aed;
+      box-shadow: 0 0 6px rgba(124,58,237,0.6);
+    }
+
+    #bottom {
+      position: absolute;
+      bottom: 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #reset-btn {
+      display: none;
+      background: none;
+      border: 1px solid #1e1a4a;
+      border-radius: 20px;
+      padding: 6px 20px;
+      color: #3a3a6a;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    #reset-btn:hover { border-color: #7c3aed; color: #7c3aed; }
+
+    #hint {
+      font-size: 10px;
+      color: #1e1a4a;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="glow"></div>
+  <div id="top-label">Tap Tempo</div>
+
+  <div id="tap-btn">
+    <div id="bpm-number">TAP</div>
+    <div id="bpm-unit">BPM</div>
+  </div>
+
+  <div id="tempo-label"></div>
+
+  <div id="dots">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+
+  <div id="bottom">
+    <button id="reset-btn">Reset</button>
+    <div id="hint">Tap · Click · Space</div>
+  </div>
+
+  <script>
+    const MAX_TAPS = 8;
+    const IDLE_TIMEOUT = 3000;
+
+    const btn = document.getElementById('tap-btn');
+    const bpmEl = document.getElementById('bpm-number');
+    const unitEl = document.getElementById('bpm-unit');
+    const tempoEl = document.getElementById('tempo-label');
+    const glowEl = document.getElementById('glow');
+    const resetBtn = document.getElementById('reset-btn');
+    const dots = document.querySelectorAll('.dot');
+
+    let taps = [];
+    let bpm = null;
+    let idleTimer = null;
+
+    function getTempoLabel(b) {
+      if (b < 60)  return 'Largo';
+      if (b < 76)  return 'Adagio';
+      if (b < 108) return 'Andante';
+      if (b < 120) return 'Moderato';
+      if (b < 156) return 'Allegro';
+      if (b < 176) return 'Vivace';
+      return 'Presto';
+    }
+
+    function computeBpm(tapList) {
+      if (tapList.length < 2) return null;
+      const intervals = tapList.slice(1).map((t, i) => t - tapList[i]);
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      return Math.round(60000 / avg);
+    }
+
+    function updateDots(count) {
+      dots.forEach((d, i) => {
+        d.classList.toggle('active', i < count);
+      });
+    }
+
+    function addRipple() {
+      const r = document.createElement('div');
+      r.className = 'ripple';
+      btn.appendChild(r);
+      setTimeout(() => r.remove(), 900);
+    }
+
+    function reset() {
+      taps = [];
+      bpm = null;
+      clearTimeout(idleTimer);
+      bpmEl.textContent = 'TAP';
+      bpmEl.classList.remove('has-result');
+      unitEl.style.display = 'none';
+      tempoEl.style.opacity = '0';
+      tempoEl.textContent = '';
+      btn.classList.remove('has-result');
+      glowEl.style.opacity = '0.5';
+      resetBtn.style.display = 'none';
+      updateDots(0);
+    }
+
+    function handleTap() {
+      const now = Date.now();
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(reset, IDLE_TIMEOUT);
+
+      taps = [...taps, now].slice(-MAX_TAPS);
+      updateDots(taps.length);
+      addRipple();
+
+      const newBpm = computeBpm(taps);
+      if (newBpm) {
+        bpm = newBpm;
+        bpmEl.textContent = bpm;
+        bpmEl.classList.add('has-result');
+        unitEl.style.display = 'block';
+        tempoEl.textContent = getTempoLabel(bpm);
+        tempoEl.style.opacity = '1';
+        btn.classList.add('has-result');
+        glowEl.style.opacity = '1';
+      }
+
+      resetBtn.style.display = taps.length > 0 ? 'block' : 'none';
+    }
+
+    // Pointer events
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressing');
+      handleTap();
+    });
+    window.addEventListener('pointerup', () => btn.classList.remove('pressing'));
+    window.addEventListener('pointerleave', () => btn.classList.remove('pressing'));
+
+    // Keyboard
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        handleTap();
+      }
+    });
+
+    resetBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      reset();
+    });
+  </script>
+</body>
+</html>
