@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tap Tempo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; }
+    html, body { height: 100%; }
+    body {
+      min-height: 100vh;
+      background: #080810;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #glow {
+      position: absolute;
+      width: 480px; height: 480px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0.5;
+      transition: opacity 0.6s;
+    }
+    #glow.beat-pulse {
+      transition: opacity 0.05s;
+      opacity: 1;
+    }
+
+    #top-label {
+      position: absolute;
+      top: 36px;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: #3a3a6a;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    #tap-btn {
+      position: relative;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 40%, #3b1d8a, #0e0820);
+      border: 2px solid #1e1245;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03);
+      transition: background 0.1s, box-shadow 0.2s, border-color 0.4s, transform 0.08s;
+      touch-action: manipulation;
+      z-index: 2;
+    }
+    #tap-btn.pressing {
+      background: radial-gradient(circle at 50% 40%, #5b21b6, #1a0a3a);
+      box-shadow: 0 0 0 6px rgba(124,58,237,0.15), 0 0 60px rgba(124,58,237,0.3);
+      transform: scale(0.962);
+    }
+    #tap-btn.has-result {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 1px rgba(124,58,237,0.2), 0 0 40px rgba(124,58,237,0.15);
+    }
+    #tap-btn.pressing.has-result {
+      box-shadow: 0 0 0 6px rgba(124,58,237,0.15), 0 0 60px rgba(124,58,237,0.3);
+    }
+    #tap-btn.beat-flash {
+      border-color: #a78bfa;
+      box-shadow: 0 0 0 8px rgba(124,58,237,0.22), 0 0 70px rgba(124,58,237,0.4);
+    }
+
+    #bpm-number {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      color: #2a2a6a;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      transition: font-size 0.2s, color 0.3s;
+    }
+    #bpm-number.has-result {
+      font-size: 72px;
+      color: #f0f0ff;
+      letter-spacing: -0.03em;
+    }
+
+    #bpm-unit {
+      font-size: 11px;
+      color: #7c3aed;
+      margin-top: 6px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 600;
+      pointer-events: none;
+      display: none;
+    }
+
+    .ripple {
+      position: absolute;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      border: 2px solid rgba(124,58,237,0.7);
+      animation: ripple 0.85s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes ripple {
+      0%   { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+
+    #tempo-label {
+      margin-top: 28px;
+      height: 20px;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      color: #5b3ea8;
+      text-transform: uppercase;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    #dots {
+      display: flex;
+      gap: 6px;
+      margin-top: 20px;
+      height: 8px;
+      align-items: center;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #1a1a36;
+      transition: all 0.15s;
+    }
+    .dot.active {
+      width: 8px; height: 8px;
+      background: #7c3aed;
+      box-shadow: 0 0 6px rgba(124,58,237,0.6);
+    }
+
+    #beat-dots {
+      display: none;
+      gap: 10px;
+      margin-top: 18px;
+      height: 10px;
+      align-items: center;
+    }
+    #beat-dots.visible { display: flex; }
+    .beat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #1e1a4a;
+      transition: all 0.08s ease-out;
+    }
+    .beat-dot.first { background: #2a2360; }
+    .beat-dot.on {
+      background: #a78bfa;
+      box-shadow: 0 0 10px rgba(167,139,250,0.8);
+      transform: scale(1.35);
+    }
+    .beat-dot.on.first {
+      background: #f0f0ff;
+      box-shadow: 0 0 12px rgba(240,240,255,0.9);
+    }
+
+    #bottom {
+      position: absolute;
+      bottom: 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #play-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #7c3aed;
+      border: 1px solid #7c3aed;
+      border-radius: 20px;
+      padding: 7px 22px;
+      color: #f5f3ff;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s, box-shadow 0.2s, transform 0.08s;
+    }
+    #play-btn:hover { background: #8b45f0; box-shadow: 0 0 18px rgba(124,58,237,0.45); }
+    #play-btn:active { transform: scale(0.96); }
+    #play-btn.playing {
+      background: #1a0a3a;
+      color: #a78bfa;
+      border-color: #5b21b6;
+    }
+    #play-btn.playing:hover { background: #23104d; }
+
+    #reset-btn {
+      display: none;
+      background: none;
+      border: 1px solid #1e1a4a;
+      border-radius: 20px;
+      padding: 6px 20px;
+      color: #3a3a6a;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    #reset-btn:hover { border-color: #7c3aed; color: #7c3aed; }
+
+    #hint {
+      font-size: 10px;
+      color: #1e1a4a;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="glow"></div>
+  <div id="top-label">Tap Tempo</div>
+
+  <div id="tap-btn">
+    <div id="bpm-number">TAP</div>
+    <div id="bpm-unit">BPM</div>
+  </div>
+
+  <div id="tempo-label"></div>
+
+  <div id="dots">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+
+  <div id="beat-dots">
+    <div class="beat-dot first"></div>
+    <div class="beat-dot"></div>
+    <div class="beat-dot"></div>
+    <div class="beat-dot"></div>
+  </div>
+
+  <div id="bottom">
+    <div id="controls">
+      <button id="play-btn">▶ Start</button>
+      <button id="reset-btn">Reset</button>
+    </div>
+    <div id="hint">Tap · Click · Space</div>
+  </div>
+
+  <script>
+    const MAX_TAPS = 8;
+    const IDLE_TIMEOUT = 3000;
+
+    const btn = document.getElementById('tap-btn');
+    const bpmEl = document.getElementById('bpm-number');
+    const unitEl = document.getElementById('bpm-unit');
+    const tempoEl = document.getElementById('tempo-label');
+    const glowEl = document.getElementById('glow');
+    const resetBtn = document.getElementById('reset-btn');
+    const playBtn = document.getElementById('play-btn');
+    const dots = document.querySelectorAll('.dot');
+    const beatDotsWrap = document.getElementById('beat-dots');
+    const beatDots = document.querySelectorAll('.beat-dot');
+
+    let taps = [];
+    let bpm = null;
+
+    // --- Metronome state ---
+    let audioCtx = null;
+    let isPlaying = false;
+    let nextNoteTime = 0;
+    let currentBeat = 0; // 0..3 within 4/4 bar
+    let schedulerTimer = null;
+    const scheduleAheadTime = 0.12; // seconds
+    const lookaheadMs = 25;
+
+    function getTempoLabel(b) {
+      if (b < 60)  return 'Largo';
+      if (b < 76)  return 'Adagio';
+      if (b < 108) return 'Andante';
+      if (b < 120) return 'Moderato';
+      if (b < 156) return 'Allegro';
+      if (b < 176) return 'Vivace';
+      return 'Presto';
+    }
+
+    function computeBpm(tapList) {
+      if (tapList.length < 2) return null;
+      const intervals = tapList.slice(1).map((t, i) => t - tapList[i]);
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      return Math.round(60000 / avg);
+    }
+
+    function updateDots(count) {
+      dots.forEach((d, i) => {
+        d.classList.toggle('active', i < count);
+      });
+    }
+
+    function addRipple() {
+      const r = document.createElement('div');
+      r.className = 'ripple';
+      btn.appendChild(r);
+      setTimeout(() => r.remove(), 900);
+    }
+
+    function reset() {
+      stopMetronome();
+      taps = [];
+      bpm = null;
+      bpmEl.textContent = 'TAP';
+      bpmEl.classList.remove('has-result');
+      unitEl.style.display = 'none';
+      tempoEl.style.opacity = '0';
+      tempoEl.textContent = '';
+      btn.classList.remove('has-result');
+      glowEl.style.opacity = '0.5';
+      resetBtn.style.display = 'none';
+      playBtn.style.display = 'none';
+      beatDotsWrap.classList.remove('visible');
+      updateDots(0);
+    }
+
+    function handleTap() {
+      const now = Date.now();
+
+      // if a tempo/metronome is already active, a fresh tap starts a new
+      // tap sequence instead of averaging with the old (stale) one
+      if (bpm !== null && taps.length > 0) {
+        const lastTap = taps[taps.length - 1];
+        if (now - lastTap > IDLE_TIMEOUT) {
+          taps = [];
+        }
+      }
+
+      taps = [...taps, now].slice(-MAX_TAPS);
+      updateDots(taps.length);
+      addRipple();
+
+      const newBpm = computeBpm(taps);
+      if (newBpm) {
+        bpm = newBpm;
+        bpmEl.textContent = bpm;
+        bpmEl.classList.add('has-result');
+        unitEl.style.display = 'block';
+        tempoEl.textContent = getTempoLabel(bpm);
+        tempoEl.style.opacity = '1';
+        btn.classList.add('has-result');
+        glowEl.style.opacity = '1';
+        playBtn.style.display = 'inline-flex';
+
+        // if metronome is already running, retime it live to the new bpm
+        if (isPlaying) {
+          currentBeat = 0;
+          nextNoteTime = audioCtx.currentTime + 0.05;
+        }
+      }
+
+      resetBtn.style.display = taps.length > 0 ? 'block' : 'none';
+    }
+
+    // --- Metronome (Web Audio, synthesized cowbell, 4/4) ---
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playCowbell(time, accent) {
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+
+      osc1.type = 'square';
+      osc2.type = 'square';
+      osc1.frequency.value = 800;
+      osc2.frequency.value = 540;
+
+      filter.type = 'bandpass';
+      filter.frequency.value = accent ? 880 : 800;
+      filter.Q.value = 1.1;
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const peak = accent ? 0.55 : 0.32;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(peak, time + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + (accent ? 0.28 : 0.18));
+
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + 0.32);
+      osc2.stop(time + 0.32);
+    }
+
+    function scheduleVisualBeat(time, beat) {
+      const delayMs = Math.max(0, (time - audioCtx.currentTime) * 1000);
+      setTimeout(() => flashBeat(beat), delayMs);
+    }
+
+    function flashBeat(beat) {
+      beatDots.forEach((d, i) => d.classList.toggle('on', i === beat));
+      btn.classList.add('beat-flash');
+      glowEl.classList.add('beat-pulse');
+      setTimeout(() => {
+        btn.classList.remove('beat-flash');
+        glowEl.classList.remove('beat-pulse');
+      }, 90);
+    }
+
+    function scheduler() {
+      while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+        const accent = currentBeat === 0;
+        playCowbell(nextNoteTime, accent);
+        scheduleVisualBeat(nextNoteTime, currentBeat);
+
+        const secondsPerBeat = 60.0 / bpm;
+        nextNoteTime += secondsPerBeat;
+        currentBeat = (currentBeat + 1) % 4;
+      }
+      schedulerTimer = setTimeout(scheduler, lookaheadMs);
+    }
+
+    function startMetronome() {
+      if (!bpm || isPlaying) return;
+      initAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      isPlaying = true;
+      currentBeat = 0;
+      nextNoteTime = audioCtx.currentTime + 0.06;
+      beatDotsWrap.classList.add('visible');
+      playBtn.textContent = '■ Stop';
+      playBtn.classList.add('playing');
+
+      scheduler();
+    }
+
+    function stopMetronome() {
+      isPlaying = false;
+      clearTimeout(schedulerTimer);
+      playBtn.textContent = '▶ Start';
+      playBtn.classList.remove('playing');
+      beatDots.forEach(d => d.classList.remove('on'));
+    }
+
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isPlaying) stopMetronome();
+      else startMetronome();
+    });
+
+    // Pointer events
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressing');
+      handleTap();
+    });
+    window.addEventListener('pointerup', () => btn.classList.remove('pressing'));
+    window.addEventListener('pointerleave', () => btn.classList.remove('pressing'));
+
+    // Keyboard
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        handleTap();
+      }
+      if (e.code === 'KeyP') {
+        e.preventDefault();
+        if (isPlaying) stopMetronome(); else startMetronome();
+      }
+    });
+
+    // Prevent pinch and double-tap zoom
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) e.preventDefault();
+      lastTap = now;
+    }, { passive: false });
+
+    resetBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      reset();
+    });
+  </script>
+</body>
+</html>
